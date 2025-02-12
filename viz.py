@@ -4,6 +4,8 @@ from data_fetching import read_csv_file
 import pandas as pd
 from matplotlib.ticker import PercentFormatter, FuncFormatter  # 添加百分比格式化器和自定义格式化工具
 import matplotlib.dates as mdates  # 导入日期格式化模块
+from matplotlib.table import Table
+from matplotlib.gridspec import GridSpec
 
 # 设置matplotlib支持中文显示
 plt.rcParams['font.sans-serif'] = ['SimHei']  # 用来正常显示中文标签
@@ -59,9 +61,15 @@ def plot_rai(data=None):
     rai_data['Date'] = pd.to_datetime(rai_data['Date'], format='%Y-%m-%d')
     rai_data.set_index('Date', inplace=True)
     
-    # 创建双图布局
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10), sharex=True)
-    
+    # 创建布局
+    fig = plt.figure(figsize=(18, 12))
+    gs = GridSpec(2, 3, width_ratios=[3, 1, 1], height_ratios=[1, 1])  # 2行3列，左侧宽，右侧窄
+
+    # 创建子图
+    ax1 = plt.subplot(gs[0, 0])  # RAI 图表
+    ax2 = plt.subplot(gs[1, 0])  # 标普500图表
+    ax_table = plt.subplot(gs[:, 1:])  # 使用右侧两列
+
     # 初始化 crash_periods
     crash_periods = []
     
@@ -139,9 +147,6 @@ def plot_rai(data=None):
     # 自动旋转日期标签
     plt.gcf().autofmt_xdate(rotation=45)  # 旋转45度
 
-    # 调整图表布局
-    plt.tight_layout()
-
     # --- 绘制标普500图表（下方子图） ---
     if price_col in rai_data.columns:
         # 绘制标普500价格
@@ -180,6 +185,174 @@ def plot_rai(data=None):
         ax2.set_ylabel('价格')
         ax2.grid(True, linestyle='--', alpha=0.7)
         ax2.legend(loc='upper left')
+
+    # --- 计算胜率 ---
+    if price_col in rai_data.columns:
+        # 计算1年（约252个交易日）的累计收益率
+        holding_period = 252
+        future_returns_1y = []
+        for i in range(len(rai_data)):
+            if i + holding_period < len(rai_data):
+                future_return = (rai_data[price_col].iloc[i+holding_period] - rai_data[price_col].iloc[i]) / rai_data[price_col].iloc[i]
+                future_returns_1y.append(future_return)
+            else:
+                future_returns_1y.append(np.nan)
+        
+        rai_data['Future_Return_1Y'] = future_returns_1y
+        
+        # 找到RAI低于-100%的日期
+        buy_signals = rai_data['World'] < -100
+        
+        # 计算胜率
+        if buy_signals.sum() > 0:
+            winning_trades = (rai_data.loc[buy_signals, 'Future_Return_1Y'] > 0.10).sum()
+            total_trades = buy_signals.sum()
+            win_rate = winning_trades / total_trades
+        else:
+            win_rate = 0.0
+        
+        # 找到RAI低于-150%的日期
+        buy_signals_150 = rai_data['World'] < -150
+        
+        # 计算胜率
+        if buy_signals_150.sum() > 0:
+            winning_trades_150 = (rai_data.loc[buy_signals_150, 'Future_Return_1Y'] > 0.10).sum()
+            total_trades_150 = buy_signals_150.sum()
+            win_rate_150 = winning_trades_150 / total_trades_150
+        else:
+            win_rate_150 = 0.0
+        
+        # 找到RAI低于-200%的日期
+        buy_signals_200 = rai_data['World'] < -200
+        
+        # 计算胜率
+        if buy_signals_200.sum() > 0:
+            winning_trades_200 = (rai_data.loc[buy_signals_200, 'Future_Return_1Y'] > 0.10).sum()
+            total_trades_200 = buy_signals_200.sum()
+            win_rate_200 = winning_trades_200 / total_trades_200
+        else:
+            win_rate_200 = 0.0
+        
+        # 计算年化交易次数
+        total_years = (rai_data.index[-1] - rai_data.index[0]).days / 365.25
+        trades_per_year = total_trades / total_years
+        trades_per_year_150 = total_trades_150 / total_years
+        trades_per_year_200 = total_trades_200 / total_years
+
+        # 修改 calculate_max_drawdown 函数
+        def calculate_max_drawdown(returns):
+            """
+            计算最大回撤
+            :param returns: 收益率序列
+            :return: 最大回撤
+            """
+            if len(returns) == 0:
+                return 0.0
+            
+            # 计算累计收益率
+            cumulative = (1 + returns).cumprod()
+            
+            # 计算峰值
+            peak = cumulative.expanding(min_periods=1).max()
+            
+            # 计算回撤
+            drawdown = (cumulative - peak) / peak
+            
+            # 返回最大回撤
+            return drawdown.min()
+
+        # 修改最大回撤计算逻辑
+        if buy_signals_200.sum() > 0:
+            # 计算 RAI < -200% 策略的最大回撤
+            drawdown_200 = calculate_max_drawdown(rai_data.loc[buy_signals_200, 'Future_Return_1Y'])
+        else:
+            drawdown_200 = 0.0
+
+        # 创建合并表格数据
+        table_data = [
+            ['买入信号', 'RAI < -100%', 'RAI < -150%', 'RAI < -200%'],
+            ['持有期', '1年', '1年', '1年'],
+            ['目标收益', '>10%', '>10%', '>10%'],
+            ['总交易次数', f'{total_trades}', f'{total_trades_150}', f'{total_trades_200}'],
+            ['平均每年交易次数', f'{trades_per_year:.1f}', f'{trades_per_year_150:.1f}', f'{trades_per_year_200:.1f}'],
+            ['获胜次数', f'{winning_trades}', f'{winning_trades_150}', f'{winning_trades_200}'],
+            ['胜率', f'{win_rate:.1%}', f'{win_rate_150:.1%}', f'{win_rate_200:.1%}'],
+            ['最大回撤', f'{calculate_max_drawdown(rai_data.loc[buy_signals, "Future_Return_1Y"]):.1%}', f'{calculate_max_drawdown(rai_data.loc[buy_signals_150, "Future_Return_1Y"]):.1%}', f'{drawdown_200:.1%}'],
+        ]
+        
+        # 在图表下方添加表格
+        ax_table.axis('off')
+        
+        # 创建表格
+        table = ax_table.table(
+            cellText=table_data,
+            colLabels=['指标', 'RAI < -100%', 'RAI < -150%', 'RAI < -200%'],
+            loc='center',
+            cellLoc='center'
+        )
+        
+        # 设置表格样式
+        table.auto_set_font_size(False)
+        table.set_fontsize(12)
+        table.scale(1, 1.5)
+        
+        # 设置标题
+        ax_table.set_title('不同 RAI 水平下买入标普500并持有1年的表现', y=1.05, fontsize=14)
+
+        # --- 创建 RAI < -200% 期间的收益表格 ---
+        if buy_signals_200.sum() > 0:
+            # 找到 RAI < -200% 的事件
+            rai_below_200 = rai_data['World'] < -200
+            events = []
+            start_date = None
+            
+            # 遍历数据，找到 RAI < -200% 的区间
+            for date, value in rai_below_200.items():
+                if value and start_date is None:
+                    start_date = date  # 记录 RAI < -200% 的开始日期
+                elif not value and start_date is not None:
+                    end_date = date  # 记录 RAI > -200% 的结束日期
+                    events.append((start_date, end_date))
+                    start_date = None
+            
+            # 计算每个事件期间的标普500收益率
+            event_returns = []
+            for start, end in events:
+                if end in rai_data.index:
+                    start_price = rai_data.loc[start, price_col]
+                    end_price = rai_data.loc[end, price_col]
+                    return_pct = (end_price - start_price) / start_price
+                    event_returns.append([start.strftime('%Y-%m-%d'), end.strftime('%Y-%m-%d'), f'{return_pct:.1%}'])
+            
+            # 创建详细表格数据
+            event_table_data = [
+                ['开始日期', '结束日期', '持有收益']
+            ]
+            event_table_data.extend(event_returns)
+            
+            # 创建新的子图用于显示详细表格
+            ax_event_table = plt.subplot(gs[1, 1:])  # 使用右侧两列
+            ax_event_table.axis('off')
+            
+            # 创建详细表格
+            event_table = ax_event_table.table(
+                cellText=event_table_data,
+                colLabels=['开始日期', '结束日期', '持有收益'],
+                loc='center',
+                cellLoc='center'
+            )
+            
+            # 设置表格样式
+            event_table.auto_set_font_size(False)
+            event_table.set_fontsize(12)
+            event_table.scale(1, 1.5)
+            
+            # 设置标题
+            ax_event_table.set_title('RAI < -200% 期间持有标普500的收益', y=1.05, fontsize=14)
+
+    # 调整布局
+    plt.tight_layout()
+    plt.subplots_adjust(wspace=0.3, hspace=0.5)  # 调整子图之间的间距
 
     plt.show()
 
