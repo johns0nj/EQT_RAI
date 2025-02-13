@@ -245,8 +245,12 @@ def plot_rai(data=None):
             """
             计算最大回撤
             :param returns: 收益率序列
-            :return: 最大回撤
+            :return: 最大回撤（负值表示回撤）
             """
+            # 打印调试信息
+            print("\n计算最大回撤的收益率序列:")
+            print(returns)
+            
             if len(returns) == 0:
                 return 0.0
             
@@ -260,12 +264,28 @@ def plot_rai(data=None):
             drawdown = (cumulative - peak) / peak
             
             # 返回最大回撤
-            return drawdown.min()
+            max_drawdown = drawdown.min()
+            
+            # 如果 max_drawdown 为 0 或接近 0，说明没有回撤
+            if abs(max_drawdown) < 1e-10:  # 使用一个很小的阈值
+                return 0.0
+                
+            return max_drawdown  # 返回负值表示回撤
 
         # 修改最大回撤计算逻辑
         if buy_signals_200.sum() > 0:
-            # 计算 RAI < -200% 策略的最大回撤
-            drawdown_200 = calculate_max_drawdown(rai_data.loc[buy_signals_200, 'Future_Return_1Y'])
+            # 打印调试信息
+            print("\nRAI < -200% 的信号点数量:", buy_signals_200.sum())
+            print("\n收益率序列:")
+            print(rai_data.loc[buy_signals_200, 'Future_Return_1Y'])
+            
+            # 确保收益率序列不为空且不全为 NaN
+            returns_200 = rai_data.loc[buy_signals_200, 'Future_Return_1Y'].dropna()
+            if len(returns_200) > 0:
+                drawdown_200 = calculate_max_drawdown(returns_200)
+            else:
+                print("\n警告：RAI < -200% 的收益率序列为空或全为 NaN")
+                drawdown_200 = 0.0
         else:
             drawdown_200 = 0.0
 
@@ -325,12 +345,15 @@ def plot_rai(data=None):
                     return_pct = (end_price - start_price) / start_price
                     event_returns.append([start.strftime('%Y-%m-%d'), end.strftime('%Y-%m-%d'), f'{return_pct:.1%}'])
             
-            # 创建详细表格数据
+            # 创建详细表格数据，并为收益添加渐变颜色
             event_table_data = event_returns
             
             # 创建新的子图用于显示详细表格
             ax_event_table = plt.subplot(gs[2, 1:])
             ax_event_table.axis('off')
+            
+            # 添加表格标题
+            ax_event_table.set_title('RAI < -200% 期间的标普500表现', y=1.05, fontsize=14)
             
             # 创建详细表格
             event_table = ax_event_table.table(
@@ -343,7 +366,30 @@ def plot_rai(data=None):
             # 设置表格样式
             event_table.auto_set_font_size(False)
             event_table.set_fontsize(12)
-            event_table.scale(1, 2.0)  # 调整行高，第二个参数控制垂直方向的缩放比例
+            event_table.scale(1, 2.0)
+            
+            # 为收益添加渐变颜色
+            returns_values = []
+            for i in range(len(event_returns)):
+                return_str = event_returns[i][2].rstrip('%')
+                return_val = float(return_str) / 100
+                returns_values.append(return_val)
+            
+            # 计算最大和最小值用于归一化
+            max_return = max(returns_values)
+            min_return = min(returns_values)
+            
+            for i, return_val in enumerate(returns_values):
+                if return_val >= 0:
+                    # 正收益用绿色渐变
+                    intensity = return_val / max(max_return, 0.0001)  # 避免除以0
+                    color = (0, min(0.8 * intensity + 0.2, 1), 0)  # RGB格式，绿色渐变
+                else:
+                    # 负收益用红色渐变
+                    intensity = return_val / min(min_return, -0.0001)  # 避免除以0
+                    color = (min(0.8 * intensity + 0.2, 1), 0, 0)  # RGB格式，红色渐变
+                
+                event_table[(i+1, 2)].set_text_props(color=color)
 
     # 调整布局
     plt.tight_layout()

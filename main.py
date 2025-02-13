@@ -3,6 +3,8 @@ import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from viz import plot_rai
+from app import app
 
 # 1. 数据加载
 def load_data(file_path):
@@ -72,4 +74,9 @@ def main():
         print(e)
 
 if __name__ == "__main__":
-    main()
+    # 运行可视化
+    plot_rai()
+    
+    # 运行 Dash 应用
+    print("Dash 应用正在运行，请访问：http://127.0.0.1:8050/")
+    app.run_server(debug=True)
