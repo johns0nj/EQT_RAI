@@ -81,27 +81,24 @@ def read_csv_file(file_path):
     # 从 Yahoo Finance 获取标普500数据
     sp500 = yf.download('^GSPC', start=start_date, end=end_date)
     
-    # 打印返回的数据结构以检查列名
-    print("\n标普500数据列名：", sp500.columns)
-    
     # 处理多级列索引
     if isinstance(sp500.columns, pd.MultiIndex):
-        # 将多级列索引转换为单级
+        # 将多级列索引转换为单级，只保留第一级
         sp500.columns = sp500.columns.get_level_values(0)
     
-    # 使用 'Close' 列代替 'Adj Close'，如果存在的话
-    if 'Adj Close' in sp500.columns:
-        price_col = 'Adj Close'
-    elif 'Close' in sp500.columns:
-        price_col = 'Close'
-    else:
-        raise KeyError("无法找到 'Adj Close' 或 'Close' 列")
+    # 使用 'Close' 列代替 'Adj Close'
+    price_col = 'Close'  # 直接使用 'Close'
     
     # 只保留收盘价
     sp500 = sp500[[price_col]]
     
     # 重置索引以便合并
     sp500.reset_index(inplace=True)
+    sp500.rename(columns={'Date': 'Date', price_col: price_col}, inplace=True)
+    
+    # 确保日期格式一致
+    sp500['Date'] = pd.to_datetime(sp500['Date'])
+    df['Date'] = pd.to_datetime(df['Date'])
     
     # 合并数据
     df = pd.merge(df, sp500[['Date', price_col]], on='Date', how='left')
