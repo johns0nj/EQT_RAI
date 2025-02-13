@@ -63,12 +63,13 @@ def plot_rai(data=None):
     
     # 创建布局
     fig = plt.figure(figsize=(18, 12))
-    gs = GridSpec(2, 3, width_ratios=[3, 1, 1], height_ratios=[1, 1])  # 2行3列，左侧宽，右侧窄
+    # 修改 GridSpec 的设置，调整高度比例
+    gs = GridSpec(3, 3, width_ratios=[3, 1, 1], height_ratios=[0.2, 1, 1])  # 3行3列，添加一个较小的顶部行
 
-    # 创建子图
-    ax1 = plt.subplot(gs[0, 0])  # RAI 图表
-    ax2 = plt.subplot(gs[1, 0])  # 标普500图表
-    ax_table = plt.subplot(gs[:, 1:])  # 使用右侧两列
+    # 重新布局子图位置
+    ax1 = plt.subplot(gs[1, 0])  # RAI 图表
+    ax2 = plt.subplot(gs[2, 0])  # 标普500图表
+    ax_table = plt.subplot(gs[0:2, 1:])  # 使用右上方区域
 
     # 初始化 crash_periods
     crash_periods = []
@@ -325,13 +326,10 @@ def plot_rai(data=None):
                     event_returns.append([start.strftime('%Y-%m-%d'), end.strftime('%Y-%m-%d'), f'{return_pct:.1%}'])
             
             # 创建详细表格数据
-            event_table_data = [
-                ['开始日期', '结束日期', '持有收益']
-            ]
-            event_table_data.extend(event_returns)
+            event_table_data = event_returns
             
             # 创建新的子图用于显示详细表格
-            ax_event_table = plt.subplot(gs[1, 1:])  # 使用右侧两列
+            ax_event_table = plt.subplot(gs[2, 1:])
             ax_event_table.axis('off')
             
             # 创建详细表格
@@ -345,10 +343,7 @@ def plot_rai(data=None):
             # 设置表格样式
             event_table.auto_set_font_size(False)
             event_table.set_fontsize(12)
-            event_table.scale(1, 1.5)
-            
-            # 设置标题
-            ax_event_table.set_title('RAI < -200% 期间持有标普500的收益', y=1.05, fontsize=14)
+            event_table.scale(1, 2.0)  # 调整行高，第二个参数控制垂直方向的缩放比例
 
     # 调整布局
     plt.tight_layout()
