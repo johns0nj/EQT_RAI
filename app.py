@@ -181,13 +181,14 @@ def create_figures():
         rows=2, cols=2,
         subplot_titles=('Risk Appetite Indicator (RAI) 时间序列图', 
                        '标普500价格走势',
-                       'RAI 分析结果'),
+                       'RAI 分析结果',
+                       'RAI < -200% 后标普500表现'),  # 添加第4个子图标题
         vertical_spacing=0.1,
         horizontal_spacing=0.2,
         row_heights=[0.5, 0.5],
         column_widths=[0.7, 0.3],
         specs=[[{"type": "scatter", "colspan": 1}, {"type": "table"}],
-               [{"type": "scatter", "colspan": 1}, None]]
+               [{"type": "scatter", "colspan": 1}, {"type": "table"}]]  # 为 (2,2) 分配表格子图
     )
 
     # 添加图表和表格
@@ -251,6 +252,37 @@ def create_figures():
     # 将表格添加到右侧
     fig.add_trace(table1, row=1, col=2)
 
+    # 找到 RAI 第一次小于 -200% 的日期
+    first_below_200 = rai_data[rai_data['World'] < -200].index.min()
+    
+    # 获取之后1年内的标普500价格数据
+    if first_below_200 and price_col in rai_data.columns:
+        one_year_later = first_below_200 + pd.Timedelta(days=365)
+        price_data = rai_data.loc[first_below_200:one_year_later, price_col]
+        
+        # 计算每日价格变动
+        daily_returns = price_data.pct_change().dropna()
+        
+        # 创建表格数据
+        table_data = [
+            ['日期', '价格', '日收益率'],
+            *[[date.strftime('%Y-%m-%d'), f'{price:.2f}', f'{ret:.2%}'] 
+              for date, price, ret in zip(price_data.index, price_data, daily_returns)]
+        ]
+        
+        # 创建表格
+        table2 = go.Table(
+            header=dict(values=['日期', '价格', '日收益率'],
+                       fill_color='paleturquoise',
+                       align='left'),
+            cells=dict(values=list(zip(*table_data)),
+                      fill_color='lavender',
+                      align='left')
+        )
+        
+        # 将表格添加到右下角
+        fig.add_trace(table2, row=2, col=2)
+
     # 更新布局
     fig.update_layout(
         height=1000,
@@ -272,17 +304,37 @@ def create_figures():
     
     # 更新标普500图表的 Y 轴范围
     if price_col in rai_data.columns:
+        # 获取最新价格
+        latest_price = rai_data[price_col].iloc[-1]
+        
+        # 计算y轴范围，确保最新价格完全可见
+        y_min = min(rai_data[price_col].min(), latest_price * 0.95)
+        y_max = max(rai_data[price_col].max(), latest_price * 1.05)
+        
         fig.update_yaxes(
+            range=[y_min, y_max],
             title_text="价格",
             row=2, col=1,
             gridcolor='lightgray',
             gridwidth=0.5,
         )
     
-    # 更新 X 轴
+    # 更新 X 轴范围，增加1个月留白
+    x_min = rai_data.index.min()
+    x_max = rai_data.index.max() + pd.Timedelta(days=30)  # 增加1个月留白
+    
     fig.update_xaxes(
+        range=[x_min, x_max],
         title_text="时间",
         row=2, col=1,
+        gridcolor='lightgray',
+        gridwidth=0.5,
+    )
+    
+    # 更新RAI图表的X轴范围
+    fig.update_xaxes(
+        range=[x_min, x_max],
+        row=1, col=1,
         gridcolor='lightgray',
         gridwidth=0.5,
     )
