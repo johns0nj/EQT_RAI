@@ -438,8 +438,8 @@ def plot_rai(data=None):
                 print(f"警告：最新价格为 NaN，已使用倒数第二个有效价格：{latest_price}")
 
             # 在图上标注最新价格和日期
-            ax2.annotate(f'{latest_date.strftime("%Y-%m-%d")}\n{latest_price:.2f}',
-                        xy=(latest_date, latest_price),
+            ax2.annotate(f'{latest_date.strftime("%Y-%m-%d")}\n{latest_price:.2f}', # type: ignore
+                        xy=(latest_date, latest_price), # type: ignore
                         xytext=(10, -20),  # 向右下方偏移
                         textcoords='offset points',
                         ha='left',  # 左对齐
@@ -448,7 +448,7 @@ def plot_rai(data=None):
                         arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0'))
             
             # 在标注之前打印一下最新值，用于调试
-            print(f"最新日期: {latest_date}")
+            print(f"最新日期: {latest_date}") # type: ignore
             print(f"最新价格: {latest_price}")
             
             # 设置 y 轴范围
