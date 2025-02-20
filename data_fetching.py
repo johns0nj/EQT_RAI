@@ -1,5 +1,4 @@
 import pandas as pd
-import yfinance as yf  # 需要安装 yfinance 库
 
 def read_csv_file(file_path):
     """
@@ -51,62 +50,34 @@ def read_csv_file(file_path):
     else:
         print("未发现负值，请检查原始数据格式")
 
-    # 获取标普500数据
-    # 首先尝试将日期转换为datetime格式
+    # 读取标普500数据
     try:
-        # 先尝试使用指定格式，包含时间部分
-        df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d %H:%M:%S.%f')
+        sp500 = pd.read_csv('SP500.csv')
+        sp500['DATE'] = pd.to_datetime(sp500['DATE'])
+        sp500.rename(columns={'DATE': 'Date', 'PRICE': 'Close'}, inplace=True)
+    except Exception as e:
+        print(f"读取标普500数据失败: {e}")
+        sp500 = pd.DataFrame(columns=['Date', 'Close'])
+
+    # 将日期转换为datetime格式
+    try:
+        df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d')
     except ValueError:
         try:
-            # 如果失败，尝试只解析日期部分
-            df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d')
-        except ValueError:
-            try:
-                # 如果仍然失败，尝试自动推断格式
-                df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-            except Exception as e:
-                print(f"日期解析失败: {e}")
-                # 如果仍然失败，尝试其他可能的格式
-                df['Date'] = pd.to_datetime(df['Date'], format='mixed', dayfirst=True)
-    
+            df['Date'] = pd.to_datetime(df['Date'], format='mixed', dayfirst=True)
+        except Exception as e:
+            print(f"日期解析失败: {e}")
+            df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+
     # 检查是否有无效日期
     if df['Date'].isnull().any():
         print("警告：发现无效日期，请检查原始数据")
         print(df[df['Date'].isnull()])
-    
-    # 获取日期范围
-    start_date = df['Date'].min()
-    end_date = df['Date'].max()
-    
-    # 从 Yahoo Finance 获取标普500数据
-    sp500 = yf.download('^GSPC', start=start_date, end=end_date)
-    
-    # 处理多级列索引
-    if isinstance(sp500.columns, pd.MultiIndex):
-        # 将多级列索引转换为单级，只保留第一级
-        sp500.columns = sp500.columns.get_level_values(0)
-    
-    # 使用 'Close' 列代替 'Adj Close'
-    price_col = 'Close'  # 直接使用 'Close'
-    
-    # 只保留收盘价
-    sp500 = sp500[[price_col]]
-    
-    # 重置索引以便合并
-    sp500.reset_index(inplace=True)
-    sp500.rename(columns={'Date': 'Date', price_col: price_col}, inplace=True)
-    
-    # 确保日期格式一致
-    sp500['Date'] = pd.to_datetime(sp500['Date'])
-    df['Date'] = pd.to_datetime(df['Date'])
-    
+
     # 合并数据
-    df = pd.merge(df, sp500[['Date', price_col]], on='Date', how='left')
+    df = pd.merge(df, sp500[['Date', 'Close']], on='Date', how='left')
 
-    # 将标普500每日价格数据保存到SP500.csv
-    sp500[['Date', price_col]].to_csv('SP500.csv', index=False, header=['DATE', 'PRICE'])
-
-    return df, price_col  # 返回 price_col
+    return df, 'Close'  # 返回 price_col
 
 def main():
     file_path = 'RAI.csv'
