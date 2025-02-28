@@ -243,6 +243,25 @@ def create_figures():
         row=1, col=1  # 第一行第一列
     )
     
+    # 添加最新RAI值和日期的标注
+    latest_date = rai_data.index[-1]
+    latest_rai = rai_data['World'].iloc[-1]
+    
+    fig.add_annotation(
+        x=latest_date,
+        y=latest_rai,
+        text=f'最新日期: {latest_date.strftime("%Y-%m-%d")}<br>RAI: {latest_rai:.1f}%',
+        showarrow=True,
+        arrowhead=1,
+        ax=50,
+        ay=-40,
+        bgcolor='rgba(255, 255, 255, 0.8)',
+        bordercolor='blue',
+        borderwidth=2,
+        borderpad=4,
+        row=1, col=1
+    )
+    
     # 添加阴影区域到 RAI 图表
     for start, end in crash_periods:
         fig.add_shape(

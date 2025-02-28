@@ -15,11 +15,16 @@ plt.rcParams['axes.unicode_minus'] = False     # 用来正常显示负号
 plt.close('all')
 
 # 自定义季度格式化函数
-def format_quarter(date_num, pos):
-    date = mdates.num2date(date_num)  # 将数值日期转换为 datetime 对象
-    year = date.year
-    quarter = (date.month - 1) // 3 + 1
-    return f'{year}-Q{quarter}'
+def format_quarter(x, pos=None):
+    """
+    格式化x轴日期为季度显示
+    """
+    try:
+        date = mdates.num2date(x)
+        return f'{date.year}-Q{(date.month - 1) // 3 + 1}'
+    except Exception as e:
+        print(f"日期格式化错误: {e}")
+        return ''
 
 def plot_rai(data=None):
     """
@@ -130,11 +135,14 @@ def plot_rai(data=None):
         ax1.yaxis.set_major_formatter(PercentFormatter())
 
         # 设置x轴显示季度
-        ax1.xaxis.set_major_formatter(FuncFormatter(format_quarter))
         ax1.xaxis.set_major_locator(mdates.MonthLocator(interval=3))  # 每3个月显示一次刻度
+        ax1.xaxis.set_major_formatter(FuncFormatter(format_quarter))
+        
+        # 设置日期格式
+        plt.setp(ax1.get_xticklabels(), rotation=45, ha='right')  # 旋转标签并右对齐
 
-        # 自动旋转日期标签
-        plt.gcf().autofmt_xdate(rotation=45)  # 旋转45度
+        # 自动调整布局以防止标签被切off
+        plt.gcf().autofmt_xdate(rotation=45, ha='right')
 
         # --- 绘制标普500图表（下方子图） ---
         if price_col in rai_data.columns and not rai_data[price_col].isna().all():
